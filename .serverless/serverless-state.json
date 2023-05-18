@@ -1,0 +1,290 @@
+{
+  "service": {
+    "service": "appointment-cron",
+    "serviceObject": {
+      "name": "appointment-cron"
+    },
+    "provider": {
+      "name": "aws",
+      "runtime": "nodejs14.x",
+      "stage": "dev",
+      "deploymentBucket": "digital-test-ttaa-jdmp-adev",
+      "environment": {
+        "AWS_NODEJS_CONNECTION_REUSE_ENABLED": "1",
+        "NODE_OPTIONS": "--enable-source-maps --stack-trace-limit=1000"
+      },
+      "iam": {
+        "role": {
+          "name": "appointment-cron-role-dev",
+          "statements": [
+            {
+              "Effect": "Allow",
+              "Action": [
+                "logs:CreateLogGroup",
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+              ],
+              "Resource": "arn:aws:logs:*:*:*"
+            },
+            {
+              "Effect": "Allow",
+              "Action": [
+                "dynamodb:*"
+              ],
+              "Resource": "arn:aws:dynamodb:us-east-1:*:table/Medic-dev"
+            }
+          ]
+        }
+      },
+      "region": "us-east-1",
+      "versionFunctions": true,
+      "deploymentBucketObject": {
+        "name": "digital-test-ttaa-jdmp-adev",
+        "serverSideEncryption": "AES256"
+      },
+      "compiledCloudFormationTemplate": {
+        "AWSTemplateFormatVersion": "2010-09-09",
+        "Description": "The AWS CloudFormation template for this Serverless application",
+        "Resources": {
+          "AppointmentLogGroup": {
+            "Type": "AWS::Logs::LogGroup",
+            "Properties": {
+              "LogGroupName": "/aws/lambda/appointment-cron-dev-appointment"
+            }
+          },
+          "IamRoleLambdaExecution": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+              "AssumeRolePolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": [
+                  {
+                    "Effect": "Allow",
+                    "Principal": {
+                      "Service": [
+                        "lambda.amazonaws.com"
+                      ]
+                    },
+                    "Action": [
+                      "sts:AssumeRole"
+                    ]
+                  }
+                ]
+              },
+              "Policies": [
+                {
+                  "PolicyName": {
+                    "Fn::Join": [
+                      "-",
+                      [
+                        "appointment-cron",
+                        "dev",
+                        "lambda"
+                      ]
+                    ]
+                  },
+                  "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                      {
+                        "Effect": "Allow",
+                        "Action": [
+                          "logs:CreateLogStream",
+                          "logs:CreateLogGroup"
+                        ],
+                        "Resource": [
+                          {
+                            "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/appointment-cron-dev*:*"
+                          }
+                        ]
+                      },
+                      {
+                        "Effect": "Allow",
+                        "Action": [
+                          "logs:PutLogEvents"
+                        ],
+                        "Resource": [
+                          {
+                            "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/appointment-cron-dev*:*:*"
+                          }
+                        ]
+                      },
+                      {
+                        "$ref": "$[\"service\"][\"provider\"][\"iam\"][\"role\"][\"statements\"][0]"
+                      },
+                      {
+                        "$ref": "$[\"service\"][\"provider\"][\"iam\"][\"role\"][\"statements\"][1]"
+                      }
+                    ]
+                  }
+                }
+              ],
+              "Path": "/",
+              "RoleName": "appointment-cron-role-dev"
+            }
+          },
+          "AppointmentLambdaFunction": {
+            "Type": "AWS::Lambda::Function",
+            "Properties": {
+              "Code": {
+                "S3Bucket": "digital-test-ttaa-jdmp-adev",
+                "S3Key": "serverless/appointment-cron/dev/1661383074453-2022-08-24T23:17:54.453Z/appointment.zip"
+              },
+              "Handler": "src/functions/appointment/handler.appointmentHandler",
+              "Runtime": "nodejs14.x",
+              "FunctionName": "appointment-cron-dev-appointment",
+              "MemorySize": 1024,
+              "Timeout": 6,
+              "Environment": {
+                "Variables": {
+                  "AWS_NODEJS_CONNECTION_REUSE_ENABLED": "1",
+                  "NODE_OPTIONS": "--enable-source-maps --stack-trace-limit=1000"
+                }
+              },
+              "Role": {
+                "Fn::GetAtt": [
+                  "IamRoleLambdaExecution",
+                  "Arn"
+                ]
+              }
+            },
+            "DependsOn": [
+              "AppointmentLogGroup"
+            ]
+          },
+          "AppointmentLambdaVersionEzI9qzppXIAT3V1SxLVdIqTfWnwYTefXuMdPY9I": {
+            "Type": "AWS::Lambda::Version",
+            "DeletionPolicy": "Retain",
+            "Properties": {
+              "FunctionName": {
+                "Ref": "AppointmentLambdaFunction"
+              },
+              "CodeSha256": "6OevcfyZejxKGeu4cUn8307hWQtZhG5dg8R1IrR+drs="
+            }
+          },
+          "AppointmentEventsRuleSchedule1": {
+            "Type": "AWS::Events::Rule",
+            "Properties": {
+              "ScheduleExpression": "rate(365 hours)",
+              "State": "ENABLED",
+              "Targets": [
+                {
+                  "Arn": {
+                    "Fn::GetAtt": [
+                      "AppointmentLambdaFunction",
+                      "Arn"
+                    ]
+                  },
+                  "Id": "appointmentSchedule"
+                }
+              ]
+            }
+          },
+          "AppointmentLambdaPermissionEventsRuleSchedule1": {
+            "Type": "AWS::Lambda::Permission",
+            "Properties": {
+              "FunctionName": {
+                "Fn::GetAtt": [
+                  "AppointmentLambdaFunction",
+                  "Arn"
+                ]
+              },
+              "Action": "lambda:InvokeFunction",
+              "Principal": "events.amazonaws.com",
+              "SourceArn": {
+                "Fn::GetAtt": [
+                  "AppointmentEventsRuleSchedule1",
+                  "Arn"
+                ]
+              }
+            }
+          }
+        },
+        "Outputs": {
+          "ServerlessDeploymentBucketName": {
+            "Value": "digital-test-ttaa-jdmp-adev",
+            "Export": {
+              "Name": "sls-appointment-cron-dev-ServerlessDeploymentBucketName"
+            }
+          },
+          "AppointmentLambdaFunctionQualifiedArn": {
+            "Description": "Current Lambda function version",
+            "Value": {
+              "Ref": "AppointmentLambdaVersionEzI9qzppXIAT3V1SxLVdIqTfWnwYTefXuMdPY9I"
+            },
+            "Export": {
+              "Name": "sls-appointment-cron-dev-AppointmentLambdaFunctionQualifiedArn"
+            }
+          }
+        }
+      },
+      "vpc": {}
+    },
+    "custom": {
+      "esbuild": {
+        "bundle": true,
+        "minify": true,
+        "sourcemap": true,
+        "exclude": [
+          "aws-sdk"
+        ],
+        "define": {},
+        "platform": "node",
+        "concurrency": 10
+      }
+    },
+    "plugins": [
+      "serverless-esbuild"
+    ],
+    "pluginsData": {},
+    "functions": {
+      "appointment": {
+        "handler": "src/functions/appointment/handler.appointmentHandler",
+        "events": [
+          {
+            "schedule": "rate(365 hours)"
+          }
+        ],
+        "name": "appointment-cron-dev-appointment",
+        "package": {
+          "artifact": ".serverless\\appointment.zip"
+        },
+        "memory": 1024,
+        "timeout": 6,
+        "runtime": "nodejs14.x",
+        "vpc": {},
+        "versionLogicalId": "AppointmentLambdaVersionEzI9qzppXIAT3V1SxLVdIqTfWnwYTefXuMdPY9I"
+      }
+    },
+    "configValidationMode": "warn",
+    "serviceFilename": "serverless.ts",
+    "initialServerlessConfig": {
+      "service": "appointment-cron",
+      "frameworkVersion": "3",
+      "plugins": {
+        "$ref": "$[\"service\"][\"plugins\"]"
+      },
+      "provider": {
+        "$ref": "$[\"service\"][\"provider\"]"
+      },
+      "package": {
+        "individually": true,
+        "artifactsS3KeyDirname": "serverless/appointment-cron/dev/code-artifacts",
+        "deploymentBucket": "digital-test-ttaa-jdmp-adev"
+      },
+      "custom": {
+        "$ref": "$[\"service\"][\"custom\"]"
+      },
+      "functions": {
+        "$ref": "$[\"service\"][\"functions\"]"
+      }
+    },
+    "layers": {},
+    "isDashboardMonitoringPreconfigured": false
+  },
+  "package": {
+    "individually": true,
+    "artifactDirectoryName": "serverless/appointment-cron/dev/1661383074453-2022-08-24T23:17:54.453Z",
+    "artifact": ""
+  }
+}
